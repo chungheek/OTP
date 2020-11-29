@@ -7,7 +7,7 @@
 #include <netdb.h>      // gethostbyname()
 #include <fcntl.h>
 
-#define BUFF_SIZE 70000
+#define BUFF_SIZE 70100
 
 /**
 * Client code

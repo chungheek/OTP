@@ -7,7 +7,7 @@
 #include <netinet/in.h>
 #include <fcntl.h>
 
-#define BUFF_SIZE 70000
+#define BUFF_SIZE 70100
 
 // Error function used for reporting issues
 void error(const char *msg)
