@@ -17,7 +17,7 @@
 */
 
 // Checks to see if plaintext has any incorrect letters 1 = true, 0 = false.
-int isIncorrect(char* string)
+int isIncorrect(char *string)
 {
     int i = 0;
     for (i; i < strlen(string); i++)
@@ -41,17 +41,17 @@ int isIncorrect(char* string)
 }
 
 // Error function used for reporting issues
-void error(const char* msg)
+void error(const char *msg)
 {
     perror(msg);
     exit(0);
 }
 
 // Set up the address struct
-void setupAddressStruct(struct sockaddr_in* address, int portNumber)
+void setupAddressStruct(struct sockaddr_in *address, int portNumber)
 {
     // Clear out the address struct
-    memset((char*)address, '\0', sizeof(*address));
+    memset((char *)address, '\0', sizeof(*address));
 
     // The address should be network capable
     address->sin_family = AF_INET;
@@ -59,32 +59,50 @@ void setupAddressStruct(struct sockaddr_in* address, int portNumber)
     address->sin_port = htons(portNumber);
 
     // Host name should be localhost
-    struct hostent* hostInfo = gethostbyname("localhost");
+    struct hostent *hostInfo = gethostbyname("localhost");
     if (hostInfo == NULL)
     {
         fprintf(stderr, "CLIENT: ERROR, no such host\n");
         exit(0);
     }
     // Copy the first IP address from the DNS entry to sin_addr.s_addr
-    memcpy((char*)&address->sin_addr.s_addr, hostInfo->h_addr_list[0], hostInfo->h_length);
+    memcpy((char *)&address->sin_addr.s_addr, hostInfo->h_addr_list[0], hostInfo->h_length);
 }
 
 // Send all method
 // https://stackoverflow.com/a/14184228/6889483
-int send_all(int socket, char* buffer, size_t length, int flags)
+int send_all(int socket, char *buffer, size_t length, int flags)
 {
     // Use charsWritten to keep track of how many characters are written
     ssize_t charsWritten;
     // Use buffIdx to advance buffer pointer
-    char* buffIdx = buffer;
+    char *buffIdx = buffer;
     // Keep on looping until length reachs 0
     while (length > 0)
     {
-        charsWritten = send(socket, buffIdx, length, flags);
-        if (charsWritten <= 0)
-            return -1;
-        buffIdx += charsWritten;
-        length -= charsWritten;
+        // If length is greater than 1000 send in 1000 increments
+        if (length > 1000)
+        {
+            charsWritten = send(socket, buffIdx, 1000, flags);
+            if (charsWritten <= 0)
+            {
+                printf("DEC CLIENT: There was an issue with send_all\n");
+                return -1;
+            }
+            buffIdx += charsWritten;
+            length -= charsWritten;
+        }
+        else
+        {
+            charsWritten = send(socket, buffIdx, length, flags);
+            if (charsWritten <= 0)
+            {
+                printf("DEC CLIENT: There was an issue with send_all\n");
+                return -1;
+            }
+            buffIdx += charsWritten;
+            length -= charsWritten;
+        }
     }
     return 0;
 }
@@ -92,11 +110,11 @@ int send_all(int socket, char* buffer, size_t length, int flags)
 // Receive all method (similar to send_all method)
 // Uses termination character '@' to stop receving message
 // https://stackoverflow.com/a/16256724/6889483
-int recv_all(int socket, char* buffer)
+int recv_all(int socket, char *buffer)
 {
     memset(buffer, '\0', BUFF_SIZE);
     ssize_t charsWritten;
-    char* buffIdx = buffer;
+    char *buffIdx = buffer;
     int length = BUFF_SIZE;
     // Will stop looping until termination character is in buffer
     while (strchr(buffer, '@') == NULL)
@@ -104,7 +122,10 @@ int recv_all(int socket, char* buffer)
         // Keep on looping until buffIdx is equal to greater than totalSize of message
         charsWritten = recv(socket, buffIdx, length, 0);
         if (charsWritten <= 0)
+        {
+            printf("DEC CLIENT: There was an issue with recv_all\n");
             return -1;
+        }
         buffIdx += charsWritten;
         length -= charsWritten;
     }
@@ -113,8 +134,7 @@ int recv_all(int socket, char* buffer)
     return 0;
 }
 
-
-int main(int argc, char* argv[])
+int main(int argc, char *argv[])
 {
     int socketFD, portNumber, charsWritten, charsRead;
     struct sockaddr_in serverAddress;
@@ -154,13 +174,13 @@ int main(int argc, char* argv[])
 
     if (key_size < cipher_size)
     {
-        fprintf(stderr, "Key size is too short. Exiting program\n", 39);
+        fprintf(stderr, "ERROR: Key size is too short. Exiting program\n", 45);
         exit(1);
     }
 
     if (isIncorrect(cipher_buff) == 1)
     {
-        fprintf(stderr, "File contains incorrect letters. Exiting program\n", 49);
+        fprintf(stderr, "ERROR: File contains incorrect letters. Exiting program\n", 55);
         exit(1);
     }
 
@@ -179,7 +199,7 @@ int main(int argc, char* argv[])
     setupAddressStruct(&serverAddress, atoi(argv[3]));
 
     // Connect to server
-    if (connect(socketFD, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) < 0)
+    if (connect(socketFD, (struct sockaddr *)&serverAddress, sizeof(serverAddress)) < 0)
     {
         printf("CLIENT: ERROR connecting");
         error("CLIENT: ERROR connecting");
@@ -189,7 +209,8 @@ int main(int argc, char* argv[])
     int dec_msg = send_all(socketFD, "DEC_CLIENT@", 11, 0);
     // Receive server message that it's okay to continue
     int server_recv = recv_all(socketFD, buffer);
-    if (server_recv < 0) error("Client ERROR reading from socket for cipher");
+    if (server_recv < 0)
+        error("Client ERROR reading from socket for cipher");
     if (strcmp(buffer, "OK") != 0)
     {
         fprintf(stderr, "DEC_CLIENT tried to connect to incorrect server!\n");
@@ -201,7 +222,8 @@ int main(int argc, char* argv[])
 
         // Receive server message for ciphertext
         int first_recv = recv_all(socketFD, buffer);
-        if (first_recv < 0) error("Client ERROR reading from socket for cipher");
+        if (first_recv < 0)
+            error("Client ERROR reading from socket for cipher");
         //printf("Received from server: %s\n", buffer);
         //fflush(stdout);
 
@@ -209,7 +231,8 @@ int main(int argc, char* argv[])
 
         // Receive server message for key
         int sec_recv = recv_all(socketFD, buffer);
-        if (sec_recv < 0) error("Client ERROR reading from socket for key");
+        if (sec_recv < 0)
+            error("Client ERROR reading from socket for key");
         //printf("Received from server: %s\n", buffer);
         //fflush(stdout);
 
@@ -218,7 +241,8 @@ int main(int argc, char* argv[])
 
         // Receive server message for key
         int cipher_recv = recv_all(socketFD, buffer);
-        if (cipher_recv < 0) error("Client ERROR reading from socket for plain text");
+        if (cipher_recv < 0)
+            error("Client ERROR reading from socket for plain text");
         printf("%s\n", buffer);
         fflush(stdout);
     }

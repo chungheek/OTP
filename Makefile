@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS=-g -Wall -std=gnu99
+CFLAGS= -Wall -std=gnu99
 
 all: keygen enc_server enc_client dec_server dec_client
 

@@ -73,20 +73,38 @@ void setupAddressStruct(struct sockaddr_in *address, int portNumber)
 // https://stackoverflow.com/a/14184228/6889483
 int send_all(int socket, char *buffer, size_t length, int flags)
 {
-    // Use charsWritten to keep track of how many characters are written
-    ssize_t charsWritten;
-    // Use buffIdx to advance buffer pointer
-    char* buffIdx = buffer;
-    // Keep on looping until length reachs 0
-    while (length > 0)
+  // Use charsWritten to keep track of how many characters are written
+  ssize_t charsWritten;
+  // Use buffIdx to advance buffer pointer
+  char *buffIdx = buffer;
+  // Keep on looping until length reachs 0
+  while (length > 0)
+  {
+    // If length is greater than 1000 send in 1000 increments
+    if (length > 1000)
     {
-        charsWritten = send(socket, buffIdx, length, flags);
-        if (charsWritten <= 0)
-            return -1;
-        buffIdx += charsWritten;
-        length -= charsWritten;
+      charsWritten = send(socket, buffIdx, 1000, flags);
+      if (charsWritten <= 0)
+      {
+        printf("ENC CLIENT: There was an issue with send_all\n");
+        return -1;
+      }
+      buffIdx += charsWritten;
+      length -= charsWritten;
     }
-    return 0;
+    else
+    {
+      charsWritten = send(socket, buffIdx, length, flags);
+      if (charsWritten <= 0)
+      {
+        printf("ENC CLIENT: There was an issue with send_all\n");
+        return -1;
+      }
+      buffIdx += charsWritten;
+      length -= charsWritten;
+    }
+  }
+  return 0;
 }
 
 // Receive all method (similar to send_all method)
@@ -94,25 +112,27 @@ int send_all(int socket, char *buffer, size_t length, int flags)
 // https://stackoverflow.com/a/16256724/6889483
 int recv_all(int socket, char *buffer)
 {
-    memset(buffer, '\0', BUFF_SIZE);
-    ssize_t charsWritten;
-    char* buffIdx = buffer;
-    int length = BUFF_SIZE;
-    // Will stop looping until termination character is in buffer
-    while (strchr(buffer, '@') == NULL)
+  memset(buffer, '\0', BUFF_SIZE);
+  ssize_t charsWritten;
+  char *buffIdx = buffer;
+  int length = BUFF_SIZE;
+  // Will stop looping until termination character is in buffer
+  while (strchr(buffer, '@') == NULL)
+  {
+    // Keep on looping until buffIdx is equal to greater than totalSize of message
+    charsWritten = recv(socket, buffIdx, length, 0);
+    if (charsWritten <= 0)
     {
-        // Keep on looping until buffIdx is equal to greater than totalSize of message
-        charsWritten = recv(socket, buffIdx, length, 0);
-        if (charsWritten <= 0)
-            return -1;
-        buffIdx += charsWritten;
-        length -= charsWritten;
+      printf("ENC CLIENT: There was an issue with recv_all\n");
+      return -1;
     }
-    // Replace the termination character with a null character in buffer before returning
-    buffer[charsWritten - 1] = '\0';
-    return 0;
+    buffIdx += charsWritten;
+    length -= charsWritten;
+  }
+  // Replace the termination character with a null character in buffer before returning
+  buffer[charsWritten - 1] = '\0';
+  return 0;
 }
-
 
 int main(int argc, char *argv[])
 {
@@ -152,19 +172,19 @@ int main(int argc, char *argv[])
 
   if (key_size < plaintext_size)
   {
-    fprintf(stderr, "Key size is too short. Exiting program\n", 39);
+    fprintf(stderr, "ERROR: Key size is too short. Exiting program\n", 45);
     exit(1);
   }
 
   if (isIncorrect(plaintext_buff) == 1)
   {
-    fprintf(stderr, "File contains incorrect letters. Exiting program\n", 49);
+    fprintf(stderr, "ERROR: File contains incorrect letters. Exiting program\n", 55);
     exit(1);
   }
 
   totalSize = strlen(plaintext_buff);
-  plaintext_buff[totalSize-1] = '@';
-  key_buff[totalSize-1] = '@';
+  plaintext_buff[totalSize - 1] = '@';
+  key_buff[totalSize - 1] = '@';
 
   // Create a socket
   socketFD = socket(AF_INET, SOCK_STREAM, 0);
@@ -186,41 +206,43 @@ int main(int argc, char *argv[])
   int enc_msg = send_all(socketFD, "ENC_CLIENT@", 11, 0);
   // Receive server message that it's okay to continue
   int server_recv = recv_all(socketFD, buffer);
-  if (server_recv < 0) error("Client ERROR reading from socket for cipher");
+  if (server_recv < 0)
+    error("Client ERROR reading from socket for cipher");
   if (strcmp(buffer, "OK") != 0)
   {
-      fprintf(stderr, "ENC_CLIENT tried to connect to incorrect server!\n");
-      exit(2);
+    fprintf(stderr, "ENC_CLIENT tried to connect to incorrect server!\n");
+    exit(2);
   }
   else
   {
-      int first_msg = send_all(socketFD, plaintext_buff, totalSize, 0);
+    int first_msg = send_all(socketFD, plaintext_buff, totalSize, 0);
 
-      // Receive server message for plaintext
-      int first_recv = recv_all(socketFD, buffer);
-      if (first_recv < 0) error("ERROR reading from socket for plaintext");
-      //printf("Received from server: %s\n", buffer);
-      //fflush(stdout);
+    // Receive server message for plaintext
+    int first_recv = recv_all(socketFD, buffer);
+    if (first_recv < 0)
+      error("ERROR reading from socket for plaintext");
+    //printf("Received from server: %s\n", buffer);
+    //fflush(stdout);
 
-      int sec_msg = send_all(socketFD, key_buff, totalSize, 0);
+    int sec_msg = send_all(socketFD, key_buff, totalSize, 0);
 
-      // Receive server message for key
-      int sec_recv = recv_all(socketFD, buffer);
-      if (sec_recv < 0) error("ERROR reading from socket for key");
-      //printf("Received from server: %s\n", buffer);
-      //fflush(stdout);
+    // Receive server message for key
+    int sec_recv = recv_all(socketFD, buffer);
+    if (sec_recv < 0)
+      error("ERROR reading from socket for key");
+    //printf("Received from server: %s\n", buffer);
+    //fflush(stdout);
 
-      // Send wait message
-      int send_wait = send_all(socketFD, "Waiting for cipher text@", 24, 0);
+    // Send wait message
+    int send_wait = send_all(socketFD, "Waiting for cipher text@", 24, 0);
 
-      // Receive server message for cipher
-      int cipher_recv = recv_all(socketFD, buffer);
-      if (cipher_recv < 0) error("ERROR reading from socket for cipher");
-      printf("%s\n", buffer);
-      fflush(stdout);
+    // Receive server message for cipher
+    int cipher_recv = recv_all(socketFD, buffer);
+    if (cipher_recv < 0)
+      error("ERROR reading from socket for cipher");
+    printf("%s\n", buffer);
+    fflush(stdout);
   }
-
-
 
   // Close the socket
   close(socketFD);

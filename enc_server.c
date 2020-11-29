@@ -31,84 +31,104 @@ void setupAddressStruct(struct sockaddr_in *address, int portNumber)
   address->sin_addr.s_addr = INADDR_ANY;
 }
 
-
 // Send all method
 // https://stackoverflow.com/a/14184228/6889483
 int send_all(int socket, char *buffer, size_t length, int flags)
 {
-    // Use charsWritten to keep track of how many characters are written
-    ssize_t charsWritten;
-    // Use buffIdx to advance buffer pointer
-    char* buffIdx = buffer;
-    // Keep on looping until length reachs 0
-    while (length > 0)
+  // Use charsWritten to keep track of how many characters are written
+  ssize_t charsWritten;
+  // Use buffIdx to advance buffer pointer
+  char *buffIdx = buffer;
+  // Keep on looping until length reachs 0
+  while (length > 0)
+  {
+    // If length is greater than 1000 send in 1000 increments
+    if (length > 1000)
     {
-        charsWritten = send(socket, buffIdx, length, flags);
-        if (charsWritten <= 0)
-            return -1;
-        buffIdx += charsWritten;
-        length -= charsWritten;
+      charsWritten = send(socket, buffIdx, 1000, flags);
+      if (charsWritten <= 0)
+      {
+        printf("ENC SERVER: There was an issue with send_all\n");
+        return -1;
+      }
+      buffIdx += charsWritten;
+      length -= charsWritten;
     }
-    return 0;
+    else
+    {
+      charsWritten = send(socket, buffIdx, length, flags);
+      if (charsWritten <= 0)
+      {
+        printf("ENC SERVER: There was an issue with send_all\n");
+        return -1;
+      }
+      buffIdx += charsWritten;
+      length -= charsWritten;
+    }
+  }
+  return 0;
 }
 
 // Receive all method
 // https://stackoverflow.com/a/16256724/6889483
 int recv_all(int socket, char *buffer)
 {
-    memset(buffer, '\0', BUFF_SIZE);
-    ssize_t charsWritten;
-    char* buffIdx = buffer;
-    int length = BUFF_SIZE;
-    // Will stop looping until termination character is in buffer
-    while (strchr(buffer, '@') == NULL)
+  memset(buffer, '\0', BUFF_SIZE);
+  ssize_t charsWritten;
+  char *buffIdx = buffer;
+  int length = BUFF_SIZE;
+  // Will stop looping until termination character is in buffer
+  while (strchr(buffer, '@') == NULL)
+  {
+    // Keep on looping until buffIdx is equal to greater than totalSize of message
+    charsWritten = recv(socket, buffIdx, length, 0);
+    if (charsWritten <= 0)
     {
-        // Keep on looping until buffIdx is equal to greater than totalSize of message
-        charsWritten = recv(socket, buffIdx, length, 0);
-        if (charsWritten <= 0)
-            return -1;
-        buffIdx += charsWritten;
-        length -= charsWritten;
+      printf("ENC SERVER: There was an issue with recv_all\n");
+      return -1;
     }
-    // Replace the termination character with a null character in buffer before returning
-    buffer[charsWritten - 1] = '\0';
-    return 0;
+    buffIdx += charsWritten;
+    length -= charsWritten;
+  }
+  // Replace the termination character with a null character in buffer before returning
+  buffer[charsWritten - 1] = '\0';
+  return 0;
 }
 
 // mod
 //https://stackoverflow.com/a/4003287/6889483
 int mod(int a, int b)
 {
-    int result = a % b;
-    if (result < 0)
-        result += b;
-    return result;
+  int result = a % b;
+  if (result < 0)
+    result += b;
+  return result;
 }
 
 // OTP encryption method
-void encrypt(char* plaintext, char* key, char* cipher, int length)
+void encrypt(char *plaintext, char *key, char *cipher, int length)
 {
-    int i = 0;
-    for (i; i < length; i++)
-    {
-        int pt_char = plaintext[i];
-        int key_char = key[i];
+  int i = 0;
+  for (i; i < length; i++)
+  {
+    int pt_char = plaintext[i];
+    int key_char = key[i];
 
-        // setup characters for 0 - 26 value
-        pt_char = (pt_char == 32) ? 26 : pt_char - 65;
-        key_char = (key_char == 32) ? 26 : key_char - 65;
+    // setup characters for 0 - 26 value
+    pt_char = (pt_char == 32) ? 26 : pt_char - 65;
+    key_char = (key_char == 32) ? 26 : key_char - 65;
 
-        // Add message + key
-        int mess_plus_key = pt_char + key_char;
-        // Get mod 27
-        int mod_27 = mod(mess_plus_key, 27);
+    // Add message + key
+    int mess_plus_key = pt_char + key_char;
+    // Get mod 27
+    int mod_27 = mod(mess_plus_key, 27);
 
-        // Add 65 to get a random char from A-Z
-        mod_27 = (mod_27 == 26) ? 32 : mod_27 + 65;
-        cipher[i] = mod_27;
-    }
-    // Add termination character at end of cipher message
-    cipher[i] = '@';
+    // Add 65 to get a random char from A-Z
+    mod_27 = (mod_27 == 26) ? 32 : mod_27 + 65;
+    cipher[i] = mod_27;
+  }
+  // Add termination character at end of cipher message
+  cipher[i] = '@';
 }
 
 int main(int argc, char *argv[])
@@ -161,61 +181,65 @@ int main(int argc, char *argv[])
     pid_t childPid = fork();
     switch (childPid)
     {
-      case -1:
-        perror("ENC SERVER could not create a new child process\n");
-        break;
-      case 0:
-        printf("SERVER: Connected to client running at host port %d\n", ntohs(clientAddress.sin_port));
+    case -1:
+      perror("ENC SERVER could not create a new child process\n");
+      break;
+    case 0:
+      printf("SERVER: Connected to client running at host port %d\n", ntohs(clientAddress.sin_port));
+      fflush(stdout);
+      // Receive confirmation msg that ENC_CLIENT is connecting
+      int charsRead = recv_all(connectionSocket, buffer);
+      if (charsRead < 0)
+        error("ERROR reading from socket for plaintext");
+      if (strcmp(buffer, "ENC_CLIENT") != 0)
+      {
+        // Send an error message 'NO' to disconnect
+        fprintf(stderr, "ENC SERVER: Incorrect client!\n");
+        int error = send_all(connectionSocket, "NO@", 3, 0);
+      }
+      else
+      {
+        // Tell client it's okay to connect
+        int okay = send_all(connectionSocket, "OK@", 3, 0);
+
+        // Receive plaintext message from client
+        int charsRead = recv_all(connectionSocket, plaintext_buff);
+        if (charsRead < 0)
+          error("ERROR reading from socket for plaintext");
+        // Set totalSize to length of plaintext_buff
+        totalSize = strlen(plaintext_buff);
+        printf("Received plaintext from client\n");
         fflush(stdout);
-        // Receive confirmation msg that ENC_CLIENT is connecting
-        int charsRead = recv_all(connectionSocket, buffer);
-        if (charsRead < 0) error("ERROR reading from socket for plaintext");
-        if (strcmp(buffer, "ENC_CLIENT") != 0)
-        {
-            // Send an error message 'NO' to disconnect
-            fprintf(stderr, "ENC SERVER: Incorrect client!\n");
-            int error = send_all(connectionSocket, "NO@", 3, 0);
-        }
-        else
-        {
-            // Tell client it's okay to connect
-            int okay = send_all(connectionSocket, "OK@", 3, 0);
 
-            // Receive plaintext message from client
-            int charsRead = recv_all(connectionSocket, plaintext_buff);
-            if (charsRead < 0) error("ERROR reading from socket for plaintext");
-            // Set totalSize to length of plaintext_buff
-            totalSize = strlen(plaintext_buff);
-            printf("Received from client plaintext: %s\n", plaintext_buff);
-            fflush(stdout);
+        // Send a message that server received plaintext
+        int send1 = send_all(connectionSocket, "I am the server, and I got your plaintext message@", 50, 0);
 
-            // Send a message that server received plaintext
-            int send1 = send_all(connectionSocket, "I am the server, and I got your plaintext message@", 50, 0);
+        // Receive key message from client
+        charsRead = recv_all(connectionSocket, key_buff);
+        if (charsRead < 0)
+          error("ERROR reading from socket for key");
+        printf("Received key from client\n");
+        fflush(stdout);
 
-            // Receive key message from client
-            charsRead = recv_all(connectionSocket, key_buff);
-            if (charsRead < 0) error("ERROR reading from socket for key");
-            printf("Received from client key: %s\n", key_buff);
-            fflush(stdout);
+        // Send a message that server received key
+        int send2 = send_all(connectionSocket, "I am the server, and I got your key message@", 44, 0);
 
-            // Send a message that server received key
-            int send2 = send_all(connectionSocket, "I am the server, and I got your key message@", 44, 0);
+        // Receive wait message from client
+        charsRead = recv_all(connectionSocket, buffer);
+        if (charsRead < 0)
+          error("ERROR reading from socket for key");
+        printf("Received wait from client\n");
+        fflush(stdout);
 
-            // Receive wait message from client
-            charsRead = recv_all(connectionSocket, buffer);
-            if (charsRead < 0) error("ERROR reading from socket for key");
-            printf("Received from client msg: %s\n", buffer);
-            fflush(stdout);
-
-            // Encrypt the message using plaintext and key buffers and send cipher message to client
-            char* cipher = calloc(1, totalSize);
-            encrypt(plaintext_buff, key_buff, cipher, totalSize);
-            int send_cipher = send_all(connectionSocket, cipher, strlen(cipher), 0);
-            // Free cipher and set to null
-            free(cipher);
-            cipher = NULL;
-        }
-        break;
+        // Encrypt the message using plaintext and key buffers and send cipher message to client
+        char *cipher = calloc(1, totalSize);
+        encrypt(plaintext_buff, key_buff, cipher, totalSize);
+        int send_cipher = send_all(connectionSocket, cipher, strlen(cipher), 0);
+        // Free cipher and set to null
+        free(cipher);
+        cipher = NULL;
+      }
+      break;
     }
     close(connectionSocket);
   }
