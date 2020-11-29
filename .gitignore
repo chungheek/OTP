@@ -1,0 +1,7 @@
+.vscode/
+# Exclude executables
+dec_client
+dec_server
+enc_client
+enc_server
+keygen
