@@ -154,56 +154,66 @@ int main(int argc, char* argv[])
         if (connectionSocket < 0)
             error("ERROR on accept");
 
-        printf("SERVER: Connected to client running at host port %d\n", ntohs(clientAddress.sin_port));
-        fflush(stdout);
 
-        // Receive confirmation msg that ENC_CLIENT is connecting
-        int charsRead = recv_all(connectionSocket, buffer);
-        if (charsRead < 0) error("ERROR reading from socket for plaintext");
-        if (strcmp(buffer, "DEC_CLIENT") != 0)
+        pid_t childPid = fork();
+        switch (childPid)
         {
-            // Send an error message 'NO' to disconnect
-            fprintf(stderr, "DEC SERVER: Incorrect client!\n");
-            int error = send_all(connectionSocket, "NO@", 3, 0);
-        }
-        else
-        {
-            // Tell client it's okay to connect
-            int okay = send_all(connectionSocket, "OK@", 3, 0);
+            case -1:
+                perror("ENC SERVER could not create a new child process\n");
+                break;
+            case 0:
+                printf("SERVER: Connected to client running at host port %d\n", ntohs(clientAddress.sin_port));
+                fflush(stdout);
 
-            // Receive cipher text message from client
-            int charsRead = recv_all(connectionSocket, cipher_buff);
-            if (charsRead < 0) error("ERROR reading from socket for plaintext");
-            // Set totalSize to length of cipher_buff
-            totalSize = strlen(cipher_buff);
-            printf("Received from client cipher: %s\n", cipher_buff);
-            fflush(stdout);
+                // Receive confirmation msg that ENC_CLIENT is connecting
+                int charsRead = recv_all(connectionSocket, buffer);
+                if (charsRead < 0) error("ERROR reading from socket for plaintext");
+                if (strcmp(buffer, "DEC_CLIENT") != 0)
+                {
+                    // Send an error message 'NO' to disconnect
+                    fprintf(stderr, "DEC SERVER: Incorrect client!\n");
+                    int error = send_all(connectionSocket, "NO@", 3, 0);
+                }
+                else
+                {
+                    // Tell client it's okay to connect
+                    int okay = send_all(connectionSocket, "OK@", 3, 0);
 
-            // Send a message that server received plaintext
-            int send1 = send_all(connectionSocket, "I am the dec server, and I got your cipher text message@", 56, 0);
+                    // Receive cipher text message from client
+                    int charsRead = recv_all(connectionSocket, cipher_buff);
+                    if (charsRead < 0) error("ERROR reading from socket for plaintext");
+                    // Set totalSize to length of cipher_buff
+                    totalSize = strlen(cipher_buff);
+                    printf("Received from client cipher: %s\n", cipher_buff);
+                    fflush(stdout);
 
-            // Receive key message from client
-            charsRead = recv_all(connectionSocket, key_buff);
-            if (charsRead < 0) error("ERROR reading from socket for key");
-            printf("Received from client key: %s\n", key_buff);
-            fflush(stdout);
+                    // Send a message that server received plaintext
+                    int send1 = send_all(connectionSocket, "I am the dec server, and I got your cipher text message@", 56, 0);
 
-            // Send a message that server received key
-            int send2 = send_all(connectionSocket, "I am dec the server, and I got your key message@", 48, 0);
+                    // Receive key message from client
+                    charsRead = recv_all(connectionSocket, key_buff);
+                    if (charsRead < 0) error("ERROR reading from socket for key");
+                    printf("Received from client key: %s\n", key_buff);
+                    fflush(stdout);
 
-            // Receive wait message from client
-            charsRead = recv_all(connectionSocket, buffer);
-            if (charsRead < 0) error("ERROR reading from socket for key");
-            printf("Received from client msg: %s\n", buffer);
-            fflush(stdout);
+                    // Send a message that server received key
+                    int send2 = send_all(connectionSocket, "I am dec the server, and I got your key message@", 48, 0);
 
-            // Decrypt the message using plaintext and key buffers and send cipher message to client
-            char* plain = calloc(1, totalSize);
-            decrypt(cipher_buff, key_buff, plain, totalSize);
-            int send_plain = send_all(connectionSocket, plain, strlen(plain), 0);
-            // Free plain and set to null
-            free(plain);
-            plain = NULL;
+                    // Receive wait message from client
+                    charsRead = recv_all(connectionSocket, buffer);
+                    if (charsRead < 0) error("ERROR reading from socket for key");
+                    printf("Received from client msg: %s\n", buffer);
+                    fflush(stdout);
+
+                    // Decrypt the message using plaintext and key buffers and send cipher message to client
+                    char* plain = calloc(1, totalSize);
+                    decrypt(cipher_buff, key_buff, plain, totalSize);
+                    int send_plain = send_all(connectionSocket, plain, strlen(plain), 0);
+                    // Free plain and set to null
+                    free(plain);
+                    plain = NULL;
+                }
+                break;
         }
         close(connectionSocket);
     }

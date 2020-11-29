@@ -135,7 +135,6 @@ int main(int argc, char *argv[])
   int plaintext_fd = open(argv[1], O_RDWR);
   if (plaintext_fd == -1)
   {
-    printf("open() failed on \"%s\"\n", argv[1]);
     perror("Error");
     exit(1);
   }
@@ -145,7 +144,6 @@ int main(int argc, char *argv[])
   int key_fd = open(argv[2], O_RDWR);
   if (key_fd == -1)
   {
-    printf("open() failed on \"%s\"\n", argv[2]);
     perror("Error");
     exit(1);
   }
@@ -154,14 +152,12 @@ int main(int argc, char *argv[])
 
   if (key_size < plaintext_size)
   {
-    printf("Key size is too short. Exiting program\n");
     fprintf(stderr, "Key size is too short. Exiting program\n", 39);
     exit(1);
   }
 
   if (isIncorrect(plaintext_buff) == 1)
   {
-    printf("The file %s contains incorrect letters\n", argv[1]);
     fprintf(stderr, "File contains incorrect letters. Exiting program\n", 49);
     exit(1);
   }

@@ -154,14 +154,12 @@ int main(int argc, char* argv[])
 
     if (key_size < cipher_size)
     {
-        printf("Key size is too short. Exiting program\n");
         fprintf(stderr, "Key size is too short. Exiting program\n", 39);
         exit(1);
     }
 
     if (isIncorrect(cipher_buff) == 1)
     {
-        printf("The file %s contains incorrect letters\n", argv[1]);
         fprintf(stderr, "File contains incorrect letters. Exiting program\n", 49);
         exit(1);
     }

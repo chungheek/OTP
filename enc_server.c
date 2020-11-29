@@ -157,56 +157,65 @@ int main(int argc, char *argv[])
     if (connectionSocket < 0)
       error("ERROR on accept");
 
-    printf("SERVER: Connected to client running at host port %d\n", ntohs(clientAddress.sin_port));
-    fflush(stdout);
-
-    // Receive confirmation msg that ENC_CLIENT is connecting
-    int charsRead = recv_all(connectionSocket, buffer);
-    if (charsRead < 0) error("ERROR reading from socket for plaintext");
-    if (strcmp(buffer, "ENC_CLIENT") != 0)
+    // Create a child process to handle concurrent processes
+    pid_t childPid = fork();
+    switch (childPid)
     {
-        // Send an error message 'NO' to disconnect
-        fprintf(stderr, "SERVER: Incorrect client!\n");
-        int error = send_all(connectionSocket, "NO@", 3, 0);
-    }
-    else
-    {
-        // Tell client it's okay to connect
-        int okay = send_all(connectionSocket, "OK@", 3, 0);
-
-        // Receive plaintext message from client
-        int charsRead = recv_all(connectionSocket, plaintext_buff);
+      case -1:
+        perror("ENC SERVER could not create a new child process\n");
+        break;
+      case 0:
+        printf("SERVER: Connected to client running at host port %d\n", ntohs(clientAddress.sin_port));
+        fflush(stdout);
+        // Receive confirmation msg that ENC_CLIENT is connecting
+        int charsRead = recv_all(connectionSocket, buffer);
         if (charsRead < 0) error("ERROR reading from socket for plaintext");
-        // Set totalSize to length of plaintext_buff
-        totalSize = strlen(plaintext_buff);
-        printf("Received from client plaintext: %s\n", plaintext_buff);
-        fflush(stdout);
+        if (strcmp(buffer, "ENC_CLIENT") != 0)
+        {
+            // Send an error message 'NO' to disconnect
+            fprintf(stderr, "ENC SERVER: Incorrect client!\n");
+            int error = send_all(connectionSocket, "NO@", 3, 0);
+        }
+        else
+        {
+            // Tell client it's okay to connect
+            int okay = send_all(connectionSocket, "OK@", 3, 0);
 
-        // Send a message that server received plaintext
-        int send1 = send_all(connectionSocket, "I am the server, and I got your plaintext message@", 50, 0);
+            // Receive plaintext message from client
+            int charsRead = recv_all(connectionSocket, plaintext_buff);
+            if (charsRead < 0) error("ERROR reading from socket for plaintext");
+            // Set totalSize to length of plaintext_buff
+            totalSize = strlen(plaintext_buff);
+            printf("Received from client plaintext: %s\n", plaintext_buff);
+            fflush(stdout);
 
-        // Receive key message from client
-        charsRead = recv_all(connectionSocket, key_buff);
-        if (charsRead < 0) error("ERROR reading from socket for key");
-        printf("Received from client key: %s\n", key_buff);
-        fflush(stdout);
+            // Send a message that server received plaintext
+            int send1 = send_all(connectionSocket, "I am the server, and I got your plaintext message@", 50, 0);
 
-        // Send a message that server received key
-        int send2 = send_all(connectionSocket, "I am the server, and I got your key message@", 44, 0);
+            // Receive key message from client
+            charsRead = recv_all(connectionSocket, key_buff);
+            if (charsRead < 0) error("ERROR reading from socket for key");
+            printf("Received from client key: %s\n", key_buff);
+            fflush(stdout);
 
-        // Receive wait message from client
-        charsRead = recv_all(connectionSocket, buffer);
-        if (charsRead < 0) error("ERROR reading from socket for key");
-        printf("Received from client msg: %s\n", buffer);
-        fflush(stdout);
+            // Send a message that server received key
+            int send2 = send_all(connectionSocket, "I am the server, and I got your key message@", 44, 0);
 
-        // Encrypt the message using plaintext and key buffers and send cipher message to client
-        char* cipher = calloc(1, totalSize);
-        encrypt(plaintext_buff, key_buff, cipher, totalSize);
-        int send_cipher = send_all(connectionSocket, cipher, strlen(cipher), 0);
-        // Free cipher and set to null
-        free(cipher);
-        cipher = NULL;
+            // Receive wait message from client
+            charsRead = recv_all(connectionSocket, buffer);
+            if (charsRead < 0) error("ERROR reading from socket for key");
+            printf("Received from client msg: %s\n", buffer);
+            fflush(stdout);
+
+            // Encrypt the message using plaintext and key buffers and send cipher message to client
+            char* cipher = calloc(1, totalSize);
+            encrypt(plaintext_buff, key_buff, cipher, totalSize);
+            int send_cipher = send_all(connectionSocket, cipher, strlen(cipher), 0);
+            // Free cipher and set to null
+            free(cipher);
+            cipher = NULL;
+        }
+        break;
     }
     close(connectionSocket);
   }
