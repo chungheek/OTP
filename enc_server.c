@@ -7,7 +7,7 @@
 #include <netinet/in.h>
 #include <fcntl.h>
 
-#define BUFF_SIZE 1000
+#define BUFF_SIZE 70000
 
 // Error function used for reporting issues
 void error(const char *msg)
@@ -104,7 +104,8 @@ void encrypt(char* plaintext, char* key, char* cipher, int length)
         int mod_27 = mod(mess_plus_key, 27);
 
         // Add 65 to get a random char from A-Z
-        cipher[i] = mod_27 + 65;
+        mod_27 = (mod_27 == 26) ? 32 : mod_27 + 65;
+        cipher[i] = mod_27;
     }
     // Add termination character at end of cipher message
     cipher[i] = '@';
@@ -159,41 +160,54 @@ int main(int argc, char *argv[])
     printf("SERVER: Connected to client running at host port %d\n", ntohs(clientAddress.sin_port));
     fflush(stdout);
 
-    // Receive plaintext message from client
-    int charsRead = recv_all(connectionSocket, plaintext_buff);
+    // Receive confirmation msg that ENC_CLIENT is connecting
+    int charsRead = recv_all(connectionSocket, buffer);
     if (charsRead < 0) error("ERROR reading from socket for plaintext");
-    // Set totalSize to length of plaintext_buff
-    totalSize = strlen(plaintext_buff);
-    printf("Received from client plaintext: %s\n", plaintext_buff);
-    fflush(stdout);
+    if (strcmp(buffer, "ENC_CLIENT") != 0)
+    {
+        // Send an error message 'NO' to disconnect
+        fprintf(stderr, "SERVER: Incorrect client!\n");
+        int error = send_all(connectionSocket, "NO@", 3, 0);
+    }
+    else
+    {
+        // Tell client it's okay to connect
+        int okay = send_all(connectionSocket, "OK@", 3, 0);
 
-    // Send a message that server received plaintext
-    int send1 = send_all(connectionSocket, "I am the server, and I got your plaintext message@", 50, 0);
+        // Receive plaintext message from client
+        int charsRead = recv_all(connectionSocket, plaintext_buff);
+        if (charsRead < 0) error("ERROR reading from socket for plaintext");
+        // Set totalSize to length of plaintext_buff
+        totalSize = strlen(plaintext_buff);
+        printf("Received from client plaintext: %s\n", plaintext_buff);
+        fflush(stdout);
 
-    // Receive key message from client
-    charsRead = recv_all(connectionSocket, key_buff);
-    if (charsRead < 0) error("ERROR reading from socket for key");
-    printf("Received from client key: %s\n", key_buff);
-    fflush(stdout);
+        // Send a message that server received plaintext
+        int send1 = send_all(connectionSocket, "I am the server, and I got your plaintext message@", 50, 0);
 
-    // Send a message that server received key
-    int send2 = send_all(connectionSocket, "I am the server, and I got your key message@", 44, 0);
+        // Receive key message from client
+        charsRead = recv_all(connectionSocket, key_buff);
+        if (charsRead < 0) error("ERROR reading from socket for key");
+        printf("Received from client key: %s\n", key_buff);
+        fflush(stdout);
 
-    // Receive wait message from client
-    charsRead = recv_all(connectionSocket, buffer);
-    if (charsRead < 0) error("ERROR reading from socket for key");
-    printf("Received from client msg: %s\n", buffer);
-    fflush(stdout);
+        // Send a message that server received key
+        int send2 = send_all(connectionSocket, "I am the server, and I got your key message@", 44, 0);
 
-    // Encrypt the message using plaintext and key buffers and send cipher message to client
-    char* cipher = calloc(1, totalSize);
-    encrypt(plaintext_buff, key_buff, cipher, totalSize);
-    int send_cipher = send_all(connectionSocket, cipher, strlen(cipher), 0);
-    // Free cipher and set to null
-    free(cipher);
-    cipher = NULL;
+        // Receive wait message from client
+        charsRead = recv_all(connectionSocket, buffer);
+        if (charsRead < 0) error("ERROR reading from socket for key");
+        printf("Received from client msg: %s\n", buffer);
+        fflush(stdout);
 
-
+        // Encrypt the message using plaintext and key buffers and send cipher message to client
+        char* cipher = calloc(1, totalSize);
+        encrypt(plaintext_buff, key_buff, cipher, totalSize);
+        int send_cipher = send_all(connectionSocket, cipher, strlen(cipher), 0);
+        // Free cipher and set to null
+        free(cipher);
+        cipher = NULL;
+    }
     close(connectionSocket);
   }
   // Close the listening socket

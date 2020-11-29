@@ -7,7 +7,7 @@
 #include <netdb.h>      // gethostbyname()
 #include <fcntl.h>
 
-#define BUFF_SIZE 1000
+#define BUFF_SIZE 70000
 
 /**
 * Client code
@@ -186,31 +186,44 @@ int main(int argc, char *argv[])
     printf("CLIENT: ERROR connecting");
     error("CLIENT: ERROR connecting");
   }
+  // Let server know that you are an encryption client
+  int enc_msg = send_all(socketFD, "ENC_CLIENT@", 11, 0);
+  // Receive server message that it's okay to continue
+  int server_recv = recv_all(socketFD, buffer);
+  if (server_recv < 0) error("Client ERROR reading from socket for cipher");
+  if (strcmp(buffer, "OK") != 0)
+  {
+      fprintf(stderr, "ENC_CLIENT tried to connect to incorrect server!\n");
+      exit(2);
+  }
+  else
+  {
+      int first_msg = send_all(socketFD, plaintext_buff, totalSize, 0);
 
-  int first_msg = send_all(socketFD, plaintext_buff, totalSize, 0);
+      // Receive server message for plaintext
+      int first_recv = recv_all(socketFD, buffer);
+      if (first_recv < 0) error("ERROR reading from socket for plaintext");
+      //printf("Received from server: %s\n", buffer);
+      //fflush(stdout);
 
-  // Receive server message for plaintext
-  int first_recv = recv_all(socketFD, buffer);
-  if(first_recv < 0) error("ERROR reading from socket for plaintext");
-  //printf("Received from server: %s\n", buffer);
-  //fflush(stdout);
+      int sec_msg = send_all(socketFD, key_buff, totalSize, 0);
 
-  int sec_msg = send_all(socketFD, key_buff, totalSize, 0);
+      // Receive server message for key
+      int sec_recv = recv_all(socketFD, buffer);
+      if (sec_recv < 0) error("ERROR reading from socket for key");
+      //printf("Received from server: %s\n", buffer);
+      //fflush(stdout);
 
-  // Receive server message for key
-  int sec_recv = recv_all(socketFD, buffer);
-  if(sec_recv < 0) error("ERROR reading from socket for key");
-  //printf("Received from server: %s\n", buffer);
-  //fflush(stdout);
+      // Send wait message
+      int send_wait = send_all(socketFD, "Waiting for cipher text@", 24, 0);
 
-  // Send wait message
-  int send_wait = send_all(socketFD, "Waiting for cipher text@", 24, 0);
+      // Receive server message for cipher
+      int cipher_recv = recv_all(socketFD, buffer);
+      if (cipher_recv < 0) error("ERROR reading from socket for cipher");
+      printf("%s\n", buffer);
+      fflush(stdout);
+  }
 
-  // Receive server message for key
-  int cipher_recv = recv_all(socketFD, buffer);
-  if(cipher_recv < 0) error("ERROR reading from socket for cipher");
-  printf("%s\n", buffer);
-  //fflush(stdout);
 
 
   // Close the socket
