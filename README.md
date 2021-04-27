@@ -26,3 +26,5 @@ In order to run
 	- run `./dec_client {ciphertextFile} {keyFile} {port}`
 
 Sample key `mykey` is provided that can be overwritten
+
+Use `Make clean` to remove executables or after code modification
