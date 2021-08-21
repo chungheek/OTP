@@ -18,5 +18,8 @@ dec_server:
 dec_client:
 	${CC} ${CFLAGS} -o dec_client dec_client.c
 
+utility:
+	${CC} ${CFLAGS} -o utility utility.c
+
 clean:
-	-rm *.o keygen enc_server enc_client dec_server dec_client
+	-rm *.o keygen enc_server enc_client dec_server dec_client utility
