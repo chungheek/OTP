@@ -11,7 +11,7 @@
 #define BUFF_SIZE 70000
 
 // OTP encryption method
-void encrypt2(char* plaintext, char* key, char* cipher, int length)
+void encrypt(char* plaintext, char* key, char* cipher, int length)
 {
     int i = 0;
     for (i; i < length; i++)
@@ -127,7 +127,7 @@ int main(int argc, char *argv[])
 
         // Encrypt the message using plaintext and key buffers and send cipher message to client
         char* cipher = calloc(1, totalSize);
-        encrypt2(plaintext_buff, key_buff, cipher, totalSize);
+        encrypt(plaintext_buff, key_buff, cipher, totalSize);
         int send_cipher = send_all(connectionSocket, cipher, strlen(cipher), 0);
         // Free cipher and set to null
         free(cipher);

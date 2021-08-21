@@ -6,7 +6,9 @@
 #include <sys/socket.h> // send(),recv()
 #include <netdb.h>      // gethostbyname()
 #include <fcntl.h>
+#include "utility.h"
 
+#define BUFF_SIZE 70000
 // Send all method
 // https://stackoverflow.com/a/14184228/6889483
 int send_all(int socket, char* buffer, size_t length, int flags)

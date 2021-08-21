@@ -7,19 +7,16 @@ keygen:
 	${CC} ${CFLAGS} -o keygen keygen.c
 
 enc_server:
-	${CC} ${CFLAGS} -o enc_server enc_server.c
+	${CC} ${CFLAGS} -o enc_server enc_server.c utility.c
 
 enc_client:
-	${CC} ${CFLAGS} -o enc_client enc_client.c
+	${CC} ${CFLAGS} -o enc_client enc_client.c utility.c
 
 dec_server:
-	${CC} ${CFLAGS} -o dec_server dec_server.c
+	${CC} ${CFLAGS} -o dec_server dec_server.c utility.c
 
 dec_client:
-	${CC} ${CFLAGS} -o dec_client dec_client.c
-
-utility:
-	${CC} ${CFLAGS} -o utility utility.c
+	${CC} ${CFLAGS} -o dec_client dec_client.c utility.c
 
 clean:
-	-rm *.o keygen enc_server enc_client dec_server dec_client utility
+	-rm *.o keygen enc_server enc_client dec_server dec_client
